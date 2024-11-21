@@ -1,144 +1,107 @@
+
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <algorithm>
+#include <sstream>
 #include "movies.h"
 
 using namespace std;
 
-// Helper functions
-void loadMoviesFromFile(const string &filename, vector<Movie> &movies);
-void loadPrefixesFromFile(const string &filename, vector<string> &prefixes);
-vector<Movie> findMoviesWithPrefix(const vector<Movie> &movies, const string &prefix);
-void printMatchingMovies(const vector<Movie> &matchingMovies, const string &prefix);
-Movie findBestMovie(const vector<Movie> &matchingMovies);
+bool extractMovieDetails(string& line, string& title, double& score);
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     if (argc < 2) {
-        cerr << "Not enough arguments provided (need at least 1 argument)." << endl;
-        cerr << "Usage: " << argv[0] << " moviesFilename prefixFilename" << endl;
-        exit(1);
+        cerr << "Insufficient arguments. Provide at least one filename." << endl;
+        cerr << "Usage: " << argv[0] << " moviesFilename [prefixFilename]" << endl;
+        return 1;
+    }
+
+    ifstream movieInput(argv[1]);
+    if (!movieInput.is_open()) {
+        cerr << "Failed to open file: " << argv[1] << endl;
+        return 1;
     }
 
     vector<Movie> movies;
-    loadMoviesFromFile(argv[1], movies);
+    string line, title;
+    double score;
+
+    while (getline(movieInput, line)) {
+        if (extractMovieDetails(line, title, score)) {
+            movies.emplace_back(title, score);
+        }
+    }
+    movieInput.close();
 
     if (argc == 2) {
-        for (const auto &movie : movies) {
+        for (const auto& movie : movies) {
             cout << movie.getMovieName() << ", " << fixed << setprecision(1) << movie.getRating() << endl;
         }
         return 0;
-}
+    }
+
+    ifstream prefixInput(argv[2]);
+    if (!prefixInput.is_open()) {
+        cerr << "Failed to open file: " << argv[2] << endl;
+        return 1;
+    }
 
     vector<string> prefixes;
-    loadPrefixesFromFile(argv[2], prefixes);
+    while (getline(prefixInput, line)) {
+        if (!line.empty()) {
+            prefixes.push_back(line);
+        }
+    }
+    prefixInput.close();
 
-    vector<pair<string, Movie>> bestMovies;
+    vector<pair<string, pair<string, double>>> topMovies;
+    for (const string& prefix : prefixes) {
+        vector<Movie> matchingMovies;
+        for (const auto& movie : movies) {
+            if (movie.getMovieName().substr(0, prefix.size()) == prefix) {
+                matchingMovies.push_back(movie);
+            }
+        }
 
-    for (const auto &prefix : prefixes) {
-        vector<Movie> matchingMovies = findMoviesWithPrefix(movies, prefix);
-
-        printMatchingMovies(matchingMovies, prefix);
+        sort(matchingMovies.begin(), matchingMovies.end(), [](const Movie& a, const Movie& b) {
+            return (a.getRating() > b.getRating()) || 
+                   (a.getRating() == b.getRating() && a.getMovieName() < b.getMovieName());
+        });
 
         if (!matchingMovies.empty()) {
-            Movie bestMovie = findBestMovie(matchingMovies);
-            bestMovies.emplace_back(prefix, bestMovie);
+            for (const auto& movie : matchingMovies) {
+                cout << movie.getMovieName() << ", " << fixed << setprecision(1) << movie.getRating() << endl;
+            }
+            cout << endl;
+            topMovies.emplace_back(prefix, make_pair(matchingMovies[0].getMovieName(), matchingMovies[0].getRating()));
+        } else {
+            cout << "No movies found with prefix " << prefix << endl;
         }
     }
 
-    for (const auto &[prefix, bestMovie] : bestMovies) {
-        cout << "Best movie with prefix " << prefix << " is: " 
-             << bestMovie.getMovieName() << " with rating " 
-             << fixed << setprecision(1) << bestMovie.getRating() << endl;
+    for (const auto& entry : topMovies) {
+        cout << "Best movie with prefix " << entry.first << " is: "
+             << entry.second.first << " with rating "
+             << fixed << setprecision(1) << entry.second.second << endl;
     }
 
     return 0;
 }
 
-// Load movies from a file into a vector
-void loadMoviesFromFile(const string &filename, vector<Movie> &movies) {
-    ifstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Could not open file " << filename << endl;
-        exit(1);
+bool extractMovieDetails(string& line, string& title, double& score) {
+    size_t delimiterPos = line.find_last_of(",");
+    if (delimiterPos == string::npos) {
+        return false;
     }
- string line;
-    while (getline(file, line)) {
-        size_t commaPos = line.find_last_of(',');
-        string movieName = line.substr(0, commaPos);
-        double movieRating = stod(line.substr(commaPos + 1));
+    title = line.substr(0, delimiterPos);
+    score = stod(line.substr(delimiterPos + 1));
 
-        // Remove quotes from movie name if present
-        if (!movieName.empty() && movieName.front() == '"') {
-            movieName = movieName.substr(1, movieName.size() - 2);
-        }
-
-        movies.emplace_back(movieName, movieRating);
+    if (!title.empty() && title.front() == '\"') {
+        title = title.substr(1, title.size() - 2);
     }
-
-    file.close();
+    return true;
 }
-
-// Load prefixes from a file into a vector
-void loadPrefixesFromFile(const string &filename, vector<string> &prefixes) {
-    ifstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Could not open file " << filename << endl;
-        exit(1);
-    }
-
-    string line;
-    while (getline(file, line)) {
-        if (!line.empty()) {
-            prefixes.push_back(line);
-        }
-    }
-
-    file.close();
-}
-
-vector<Movie> findMoviesWithPrefix(const vector<Movie> &movies, const string &prefix) {
-    vector<Movie> matchingMovies;
-
-    auto start = lower_bound(movies.begin(), movies.end(), prefix,
-                             [](const Movie &movie, const string &prefix) {
-                                 return movie.getMovieName().substr(0, prefix.size()) < prefix;
-                             });
-
-    for (auto it = start; it != movies.end(); ++it) {
-        if (it->getMovieName().substr(0, prefix.size()) == prefix) {
-            matchingMovies.push_back(*it);
-        } else {
-            break;
-        }
-    }
-
-    // Sort by rating descending, then alphabetically
-    sort(matchingMovies.begin(), matchingMovies.end(), [](const Movie &a, const Movie &b) {
-        return (a.getRating() > b.getRating()) ||
-               (a.getRating() == b.getRating() && a.getMovieName() < b.getMovieName());
-    });
-
-    return matchingMovies;
-}
-
-
-// Print matching movies
-void printMatchingMovies(const vector<Movie> &matchingMovies, const string &prefix) {
-    if (matchingMovies.empty()) {
-        cout << "No movies found with prefix " << prefix << endl;
-    } else {
-        for (const auto &movie : matchingMovies) {
-            cout << movie.getMovieName() << ", " << fixed << setprecision(1) << movie.getRating() << endl;
-        }
-        cout << endl;
-    }
-}
-
-Movie findBestMovie(const vector<Movie> &matchingMovies) {
-    return matchingMovies.front(); // The first movie is the best due to sorted order
-}
-
 

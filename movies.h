@@ -7,8 +7,8 @@ class Movie {
 public:
     Movie(std::string n, double r);
 
-    std::string getMovieName() const; // Mark as const
-    double getRating() const;         // Mark as const
+    std::string getMovieName() const; // Marked as const
+    double getRating() const;         // Marked as const
 
 private:
     std::string movieName;
