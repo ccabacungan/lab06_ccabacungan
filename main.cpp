@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -11,6 +10,7 @@
 using namespace std;
 
 bool extractMovieDetails(string& line, string& title, double& score);
+bool hasPrefix(const std::string& movieName, const std::string& prefix);
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -35,6 +35,15 @@ int main(int argc, char** argv) {
         }
     }
     movieInput.close();
+
+    // Sort movies alphabetically (case-insensitive)
+    stable_sort(movies.begin(), movies.end(), [](const Movie& a, const Movie& b) {
+        string nameA = a.getMovieName();
+        string nameB = b.getMovieName();
+        transform(nameA.begin(), nameA.end(), nameA.begin(), ::tolower);
+        transform(nameB.begin(), nameB.end(), nameB.begin(), ::tolower);
+        return nameA < nameB;
+    });
 
     if (argc == 2) {
         for (const auto& movie : movies) {
@@ -61,15 +70,10 @@ int main(int argc, char** argv) {
     for (const string& prefix : prefixes) {
         vector<Movie> matchingMovies;
         for (const auto& movie : movies) {
-            if (movie.getMovieName().substr(0, prefix.size()) == prefix) {
+            if (hasPrefix(movie.getMovieName(), prefix)) {
                 matchingMovies.push_back(movie);
             }
         }
-
-        sort(matchingMovies.begin(), matchingMovies.end(), [](const Movie& a, const Movie& b) {
-            return (a.getRating() > b.getRating()) || 
-                   (a.getRating() == b.getRating() && a.getMovieName() < b.getMovieName());
-        });
 
         if (!matchingMovies.empty()) {
             for (const auto& movie : matchingMovies) {
@@ -105,3 +109,10 @@ bool extractMovieDetails(string& line, string& title, double& score) {
     return true;
 }
 
+bool hasPrefix(const std::string& movieName, const std::string& prefix) {
+    if (prefix.size() > movieName.size()) {
+        return false;
+    }
+    return std::equal(prefix.begin(), prefix.end(), movieName.begin(),
+                      [](char a, char b) { return tolower(a) == tolower(b); });
+}
