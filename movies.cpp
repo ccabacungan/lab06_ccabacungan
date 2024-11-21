@@ -1,14 +1,11 @@
 #include "movies.h"
 
-// Constructor
 Movie::Movie(std::string n, double r) : movieName(n), rating(r) {}
 
-// Getter for movie name
-std::string Movie::getMovieName() const { // Marked as const
+std::string Movie::getMovieName() const { 
     return movieName;
 }
 
-// Getter for rating
-double Movie::getRating() const { // Marked as const
+double Movie::getRating() const { 
     return rating;
 }
