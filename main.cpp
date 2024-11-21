@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <iomanip>
+#include <algorithm>
 #include "movies.h"
 
 using namespace std;
@@ -98,16 +99,31 @@ void loadPrefixesFromFile(const string &filename, vector<string> &prefixes) {
     file.close();
 }
 
-// Find movies matching a given prefix
 vector<Movie> findMoviesWithPrefix(const vector<Movie> &movies, const string &prefix) {
     vector<Movie> matchingMovies;
-    for (const auto &movie : movies) {
-        if (movie.getMovieName().substr(0, prefix.size()) == prefix) {
-            matchingMovies.push_back(movie);
+
+    auto start = lower_bound(movies.begin(), movies.end(), prefix,
+                             [](const Movie &movie, const string &prefix) {
+                                 return movie.getMovieName().substr(0, prefix.size()) < prefix;
+                             });
+
+    for (auto it = start; it != movies.end(); ++it) {
+        if (it->getMovieName().substr(0, prefix.size()) == prefix) {
+            matchingMovies.push_back(*it);
+        } else {
+            break;
         }
     }
+
+    // Sort by rating descending, then alphabetically
+    sort(matchingMovies.begin(), matchingMovies.end(), [](const Movie &a, const Movie &b) {
+        return (a.getRating() > b.getRating()) ||
+               (a.getRating() == b.getRating() && a.getMovieName() < b.getMovieName());
+    });
+
     return matchingMovies;
 }
+
 
 // Print matching movies
 void printMatchingMovies(const vector<Movie> &matchingMovies, const string &prefix) {
@@ -121,15 +137,8 @@ void printMatchingMovies(const vector<Movie> &matchingMovies, const string &pref
     }
 }
 
-// Find the best movie (highest rating, break ties alphabetically)
 Movie findBestMovie(const vector<Movie> &matchingMovies) {
-    Movie bestMovie = matchingMovies[0];
-    for (const auto &movie : matchingMovies) {
-        if (movie.getRating() > bestMovie.getRating() || 
-            (movie.getRating() == bestMovie.getRating() && movie.getMovieName() < bestMovie.getMovieName())) {
-            bestMovie = movie;
-        }
-    }
-    return bestMovie;
+    return matchingMovies.front(); // The first movie is the best due to sorted order
 }
+
 
