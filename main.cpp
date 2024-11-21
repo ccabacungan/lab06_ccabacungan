@@ -67,7 +67,9 @@ int main(int argc, char** argv) {
     prefixInput.close();
 
     vector<pair<string, pair<string, double>>> topMovies;
+
     for (const string& prefix : prefixes) {
+        // Collect matching movies for the current prefix
         vector<Movie> matchingMovies;
         for (const auto& movie : movies) {
             if (hasPrefix(movie.getMovieName(), prefix)) {
@@ -75,24 +77,37 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Sort matching movies by rating (descending), then by name (case-insensitive)
+        stable_sort(matchingMovies.begin(), matchingMovies.end(), [](const Movie& a, const Movie& b) {
+            if (a.getRating() != b.getRating()) {
+                return a.getRating() > b.getRating(); // Higher rating comes first
+            }
+            string nameA = a.getMovieName(), nameB = b.getMovieName();
+            transform(nameA.begin(), nameA.end(), nameA.begin(), ::tolower);
+            transform(nameB.begin(), nameB.end(), nameB.begin(), ::tolower);
+            return nameA < nameB; // Secondary sort: alphabetical
+        });
+
         if (!matchingMovies.empty()) {
             for (const auto& movie : matchingMovies) {
                 cout << movie.getMovieName() << ", " << fixed << setprecision(1) << movie.getRating() << endl;
             }
             cout << endl;
+            // Add the best movie for this prefix
             topMovies.emplace_back(prefix, make_pair(matchingMovies[0].getMovieName(), matchingMovies[0].getRating()));
         } else {
             cout << "No movies found with prefix " << prefix << endl;
         }
     }
 
+    // Print best movies for each prefix
     for (const auto& entry : topMovies) {
         cout << "Best movie with prefix " << entry.first << " is: "
              << entry.second.first << " with rating "
              << fixed << setprecision(1) << entry.second.second << endl;
     }
 
-    return 0;
+    return 0;  // Added the return statement for main
 }
 
 bool extractMovieDetails(string& line, string& title, double& score) {
